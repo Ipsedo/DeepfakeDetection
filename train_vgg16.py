@@ -1,6 +1,8 @@
 import torch as th
 import torch.nn as nn
 import torchvision.models as models
+from torchnet.meter import AUCMeter
+
 import numpy as np
 
 from math import ceil
@@ -22,7 +24,7 @@ def get_vgg16_modified() -> nn.Module:
 
 
 # 1000 images en 224 * 224 * 3 ~= 42Go
-def main():
+def train_vgg16():
     # Create argument parser
     parser = argparse.ArgumentParser("Train VGG16 Main")
     parser.add_argument("-d", "--data-path", type=str, required=True, dest="data_path")
@@ -119,5 +121,69 @@ def main():
     th.save(vgg16.state_dict(), output_model_path)
 
 
+def test_vgg16():
+    parser = argparse.ArgumentParser("Test VGG16 Main")
+    parser.add_argument("-d", "--data-path", type=str, required=True, dest="data_path")
+    parser.add_argument("-l", "--label-path", type=str, required=True, dest="label_path")
+    parser.add_argument("-m", "--model-path", type=str, required=True, dest="model_path")
+
+    args = parser.parse_args()
+
+    data_path = args.data_path
+    label_path = args.label_path
+    model_path = args.model_path
+
+    # Test if numpy data and labels exist
+    if not exists(data_path):
+        raise FileNotFoundError("Numpy data file doesn't exist ({}) !".format(data_path))
+    if not exists(label_path):
+        raise FileNotFoundError("Numpy label file doesn't exist ({}) !".format(label_path))
+    # Test if model save file exist
+    if not exists(model_path):
+        raise FileNotFoundError("Model state dict file doesn't exist ({}) !".format(model_path))
+
+    print("Load model...")
+    # Load model
+    vgg16 = get_vgg16_modified()
+    vgg16.load_state_dict(th.load(model_path))
+    vgg16.cuda()
+    vgg16.eval()
+
+    # Create AUC Meter
+    auc_meter = AUCMeter()
+
+    print("Load data...")
+    # Load data
+    data = np.load(data_path)
+    labels = np.load(label_path)
+
+    batch_size = 32
+    nb_batch = ceil(data.shape[0] / batch_size)
+
+    # Loop on eval data
+    for i_b in tqdm(range(nb_batch)):
+        # Get batch indexes
+        i_min = i_b * batch_size
+        i_max = (i_b + 1) * batch_size
+        i_max = i_max if i_max < data.shape[0] else data.shape[0]
+
+        # Slice data to get batch
+        batch = data[i_min:i_max, :, :, :]
+        batch = batch.transpose(0, 3, 1, 2)
+        batch = th.tensor(batch).cuda().float() / 255.
+
+        # And labels
+        batch_label = th.tensor(labels[i_min:i_max]).cuda().float()
+
+        # Forward - Inférence
+        out = vgg16(batch).squeeze(1)
+
+        # Update metric
+        auc_meter.add(out.cpu().detach(), batch_label.cpu().detach())
+
+    print("AUC value = {}".format(auc_meter.value()[0]))
+
+
 if __name__ == "__main__":
-    main()
+    #train_vgg16()
+    test_vgg16()
