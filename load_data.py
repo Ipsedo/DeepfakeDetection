@@ -12,16 +12,21 @@ import json
 from tqdm import tqdm
 
 
-def load_sub_dataset(data_path: str) -> typing.Tuple[np.ndarray, np.ndarray]:
+def load_sub_dataset(data_path: str, width: int, height: int) -> typing.Tuple[np.ndarray, np.ndarray]:
     metadata_file = open(join(data_path, "metadata.json"))
     metadata_json = json.load(metadata_file)
 
     mp4_files = [f for f in listdir(data_path) if isfile(join(data_path, f))
                  and splitext(join(data_path, f))[1] == ".mp4"]
 
-    datas = []
-    labels = []
-    for mp4 in tqdm(mp4_files[:10]):
+    nb_load = 1000
+    nb_frame_per_video = 300
+    datas = np.zeros((nb_load * nb_frame_per_video, width, height, 3), dtype=np.uint8)
+    labels = np.zeros((nb_load * nb_frame_per_video,), dtype=np.uint8)
+
+    i = 0
+
+    for mp4 in tqdm(mp4_files[:nb_load]):
         lbl = 1 if metadata_json[mp4]["label"] == "FAKE" else 0
 
         cap = cv2.VideoCapture(join(data_path, mp4))
@@ -33,8 +38,12 @@ def load_sub_dataset(data_path: str) -> typing.Tuple[np.ndarray, np.ndarray]:
         if frame.shape[0] < frame.shape[1]:
             frame = frame.transpose(1, 0, 2)
 
-        datas.append(frame)
-        labels.append(lbl)
+        frame = cv2.resize(frame, (width, height))
+
+        datas[i, :, :, :] = frame
+        labels[i] = lbl
+
+        i += 1
 
         while success:
             success, frame = cap.read()
@@ -45,10 +54,14 @@ def load_sub_dataset(data_path: str) -> typing.Tuple[np.ndarray, np.ndarray]:
             if frame.shape[0] < frame.shape[1]:
                 frame = frame.transpose(1, 0, 2)
 
-            datas.append(frame)
-            labels.append(lbl)
+            frame = cv2.resize(frame, (width, height))
 
-    return np.stack(datas, axis=0), np.asarray(labels)
+            datas[i, :, :, :] = frame
+            labels[i] = lbl
+
+            i += 1
+
+    return datas, labels
 
 
 def save_ndarrays(output_dir: str, prefix: str, frames: np.ndarray, labels: np.ndarray) -> None:
@@ -77,11 +90,11 @@ def main():
     video_dir = args.video_dir
     output_dir = args.output_dir
 
-    frames, labels = load_sub_dataset(video_dir)
+    frames, labels = load_sub_dataset(video_dir, 224, 224)
 
     print(frames.shape, labels.shape)
 
-    save_ndarrays(output_dir, video_dir.split("/")[-1], frames, labels)
+    save_ndarrays(output_dir, video_dir.split("/")[-1] + "_224-224_1000", frames, labels)
 
 
 if __name__ == "__main__":
