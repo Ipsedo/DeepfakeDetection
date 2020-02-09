@@ -19,9 +19,9 @@ def load_sub_dataset(data_path: str, width: int, height: int) -> typing.Tuple[np
     mp4_files = [f for f in listdir(data_path) if isfile(join(data_path, f))
                  and splitext(join(data_path, f))[1] == ".mp4"]
 
-    nb_load = 1000
+    nb_load = 1
     nb_frame_per_video = 300
-    datas = np.zeros((nb_load * nb_frame_per_video, width, height, 3), dtype=np.uint8)
+    datas = np.zeros((nb_load * nb_frame_per_video, height, width, 3), dtype=np.uint8)
     labels = np.zeros((nb_load * nb_frame_per_video,), dtype=np.uint8)
 
     i = 0
@@ -35,7 +35,7 @@ def load_sub_dataset(data_path: str, width: int, height: int) -> typing.Tuple[np
 
         success, frame = cap.read()
 
-        if frame.shape[0] < frame.shape[1]:
+        if frame.shape[0] > frame.shape[1]:
             frame = frame.transpose(1, 0, 2)
 
         frame = cv2.resize(frame, (width, height))
@@ -51,7 +51,7 @@ def load_sub_dataset(data_path: str, width: int, height: int) -> typing.Tuple[np
             if not success:
                 break
 
-            if frame.shape[0] < frame.shape[1]:
+            if frame.shape[0] > frame.shape[1]:
                 frame = frame.transpose(1, 0, 2)
 
             frame = cv2.resize(frame, (width, height))
@@ -90,11 +90,11 @@ def main():
     video_dir = args.video_dir
     output_dir = args.output_dir
 
-    frames, labels = load_sub_dataset(video_dir, 224, 224)
+    frames, labels = load_sub_dataset(video_dir, 1920, 1080)
 
     print(frames.shape, labels.shape)
 
-    save_ndarrays(output_dir, video_dir.split("/")[-1] + "_224-224_1000", frames, labels)
+    save_ndarrays(output_dir, video_dir.split("/")[-1] + "_1920-1080_1", frames, labels)
 
 
 if __name__ == "__main__":
