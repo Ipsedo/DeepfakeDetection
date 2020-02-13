@@ -15,6 +15,9 @@ import sys
 from tqdm import tqdm
 
 
+train_ratio = 0.75
+
+
 def get_vgg16_modified() -> nn.Module:
     vgg16 = models.vgg16()
 
@@ -68,6 +71,11 @@ def train_vgg16():
     data = np.load(data_path)
     labels = np.load(label_path)
 
+    # Separate eval data
+    nb_split = int(data.shape[0] * train_ratio)
+    data = data[:nb_split]
+    labels = labels[:nb_split]
+
     print("Shuffle data...")
     # Shuffle data
     # https://stackoverflow.com/questions/6127503/shuffle-array-in-c
@@ -96,7 +104,6 @@ def train_vgg16():
 
             # Slice data to get batch
             batch = data[i_min:i_max, :, :, :]
-            batch = batch.transpose(0, 3, 1, 2)
             batch = th.tensor(batch).cuda().float() / 255.
 
             # And labels
@@ -157,6 +164,11 @@ def test_vgg16():
     data = np.load(data_path)
     labels = np.load(label_path)
 
+    # Split eval
+    nb_split = int(data.shape[0] * train_ratio)
+    data = data[nb_split:]
+    labels = labels[nb_split:]
+
     batch_size = 32
     nb_batch = ceil(data.shape[0] / batch_size)
 
@@ -185,5 +197,5 @@ def test_vgg16():
 
 
 if __name__ == "__main__":
-    #train_vgg16()
-    test_vgg16()
+    train_vgg16()
+    #test_vgg16()
